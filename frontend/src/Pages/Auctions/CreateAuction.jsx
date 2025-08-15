@@ -26,19 +26,24 @@ const CreateAuction = () => {
 	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 	const onSubmit = async (data) => {
 		try {
+			// Convert local datetime to UTC ISO string
+			const goLiveTimeUTC = new Date(data.goLiveTime).toISOString();
+
 			const payload = {
 				itemName: data.itemName,
 				description: data.description || "",
 				startingPrice: parseFloat(data.startingPrice),
 				bidIncrement: parseFloat(data.bidIncrement),
-				goLiveTime: data.goLiveTime,
+				goLiveTime: goLiveTimeUTC, // Send UTC time
 				duration: parseInt(data.duration, 10),
 			};
+
 			const res = await axios.post(
 				`${backendUrl}/api/auction/create`,
 				payload,
 				{ withCredentials: true }
 			);
+
 			if (res.data.success) {
 				toast.success("Auction created successfully");
 				navigate("/auctions");

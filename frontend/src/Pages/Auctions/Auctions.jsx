@@ -95,7 +95,7 @@ const Auctions = () => {
 		return (
 			<Card
 				key={auction.id}
-				className="bg-white border border-gray-200 hover:border-indigo-100 hover:shadow-lg transition-all duration-300 ease-in-out overflow-hidden group"
+				className="bg-white border border-gray-200 hover:border-indigo-100 hover:shadow-lg transition-all duration-300 ease-in-out overflow-hidden group flex flex-col justify-between h-full"
 			>
 				<CardHeader>
 					<div className="flex justify-between items-start">
