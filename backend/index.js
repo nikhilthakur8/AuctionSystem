@@ -3,7 +3,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const Redis = require("ioredis");
-const db = require("./models"); 
+const db = require("./models");
 const authRouter = require("./routes/auth");
 const userRouter = require("./routes/user");
 const auctionRouter = require("./routes/auction");
@@ -14,6 +14,10 @@ const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 initSocket(server);
+app.use(express.static(path.join(__dirname, "public")));
+app.get(/^\/(?!api).*/, (req, res) => {
+	res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 app.use(express.json());
 app.use(
