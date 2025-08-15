@@ -17,8 +17,7 @@ const Auctions = () => {
 	const [auctions, setAuctions] = useState([]);
 	const [loading, setLoading] = useState(true);
 
-	const backendUrl =
-		import.meta.env.VITE_BACKEND_URL || import.meta.env.BACKEND_URL || "";
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 
 	useEffect(() => {
 		window.scrollTo(0, 0);

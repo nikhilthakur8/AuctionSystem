@@ -20,7 +20,7 @@ const AuctionPage = () => {
 	const [counterAmount, setCounterAmount] = useState(""); // State for seller's counter-offer input
 	const [showCounterInput, setShowCounterInput] = useState(false); // State to toggle counter-offer input for seller
 
-	const backendUrl = import.meta.env.VITE_BACKEND_URL;
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 
 	// Function to fetch auction data, wrapped in useCallback to prevent re-creation
 	const fetchAuction = useCallback(async () => {

@@ -23,8 +23,7 @@ const CreateAuction = () => {
 		formState: { errors, isSubmitting },
 	} = useForm();
 
-	const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 	const onSubmit = async (data) => {
 		try {
 			const payload = {

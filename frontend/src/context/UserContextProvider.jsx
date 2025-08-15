@@ -6,7 +6,7 @@ export const UserContextProvider = ({ children }) => {
 	const [userData, setUserData] = useState(null);
 	const login = (userData) => setUserData(userData);
 	const logout = () => setUserData(null);
-	const backendUrl = import.meta.env.VITE_BACKEND_URL;
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 
 	useEffect(() => {
 		async function fetchProfile() {

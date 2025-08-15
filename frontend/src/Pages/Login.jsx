@@ -28,7 +28,7 @@ const Login = () => {
 	} = useForm();
 
 	const onSubmit = async (data) => {
-		const backendUrl = import.meta.env.VITE_BACKEND_URL;
+		const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 		try {
 			const res = await axios.post(`${backendUrl}/api/auth/login`, data, {
 				withCredentials: true,

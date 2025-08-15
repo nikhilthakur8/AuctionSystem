@@ -18,8 +18,7 @@ const LiveAuction = () => {
 	const [notifications, setNotifications] = useState([]);
 	const [loading, setLoading] = useState(true);
 
-	const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 	useEffect(() => {
 		async function fetchAuction() {
 			try {

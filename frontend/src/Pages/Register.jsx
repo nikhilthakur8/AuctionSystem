@@ -28,7 +28,7 @@ const Register = () => {
 	const { login } = useUserContext();
 
 	const onSubmit = async (data) => {
-		const backendUrl = import.meta.env.VITE_BACKEND_URL;
+		const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 		try {
 			const res = await axios.post(
 				`${backendUrl}/api/auth/register`,
@@ -155,7 +155,7 @@ const Register = () => {
 							onClick={() => navigate("/login")}
 							className="cursor-pointer text-indigo-600 hover:underline"
 						>
-							Login	
+							Login
 						</span>
 					</p>
 				</CardFooter>
