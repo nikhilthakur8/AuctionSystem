@@ -368,6 +368,7 @@ async function handleRejectBid(req, res) {
 		});
 
 		auction.status = "closed";
+		auction.statusAfterBid = "rejected";
 		await auction.save();
 
 		// Notify via email
