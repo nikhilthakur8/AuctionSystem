@@ -1,10 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useUserContext } from "@/context/context";
 
 const HeroMinimalBox = () => {
 	const navigate = useNavigate();
-
+	const { userData } = useUserContext();
 	return (
 		<section className="bg-gray-50 min-h-screen flex items-center justify-center overflow-hidden">
 			{/* Hero Box */}
@@ -27,7 +28,7 @@ const HeroMinimalBox = () => {
 					<div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
 						<Button
 							size="lg"
-							className="bg-indigo-600 text-white hover:bg-indigo-500 font-medium"
+							className="bg-indigo-600 text-white hover:bg-white hover:text-indigo-600 border-indigo-600 border font-medium"
 							onClick={() => navigate("/auctions")}
 						>
 							Browse Auctions
@@ -36,9 +37,11 @@ const HeroMinimalBox = () => {
 							size="lg"
 							variant="outline"
 							className="border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white font-medium"
-							onClick={() => navigate("/register")}
+							onClick={() =>
+								navigate(userData ? "/auctions" : "/register")
+							}
 						>
-							Get Started
+							{userData ? "Explore Auctions" : "Get Started"}
 						</Button>
 					</div>
 

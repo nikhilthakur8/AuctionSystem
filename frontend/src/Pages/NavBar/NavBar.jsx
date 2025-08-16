@@ -2,11 +2,36 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useUserContext } from "@/context/context";
 import { Button } from "@/components/ui/button";
+import axios from "axios";
+import { toast } from "sonner";
+import { LoaderIcon } from "lucide-react";
 
 const Navbar = () => {
 	const { userData, logout } = useUserContext();
 	const navigate = useNavigate();
-
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
+	const [loading, setLoading] = React.useState(false);
+	const handleLogout = () => {
+		setLoading(true);
+		axios
+			.post(
+				`${backendUrl}/api/auth/logout`,
+				{},
+				{ withCredentials: true }
+			)
+			.then((res) => {
+				if (res.data.success) {
+					logout();
+					navigate("/login");
+				}
+				toast.success("Logout Successfully");
+			})
+			.catch((err) => {
+				toast.error("Logout Failed");
+				console.error(err);
+			})
+			.finally(() => setLoading(false));
+	};
 	return (
 		<nav className="bg-white shadow-md fixed w-full top-0 z-50">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,17 +64,19 @@ const Navbar = () => {
 						{userData ? (
 							<>
 								<span className="text-gray-700">
-									Hello, {userData.name}
+									{userData.name}
 								</span>
 								<Button
 									size="sm"
 									variant="outline"
-									onClick={() => {
-										logout();
-										navigate("/login");
-									}}
+									onClick={handleLogout}
+									disabled={loading}
 								>
-									Logout
+									{loading ? (
+										<LoaderIcon className="animate-spin" />
+									) : (
+										"Logout"
+									)}
 								</Button>
 							</>
 						) : (

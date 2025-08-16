@@ -13,14 +13,15 @@ const {
 	handleCounterResponse,
 	handleGetInvoice,
 } = require("../controllers/auction.controller");
+const authenticateUser = require("../middleware/authenticate");
 const auctionRouter = Router();
 
-auctionRouter.post("/create", handleCreateAuction);
-auctionRouter.get("/my-auctions", handleGetMyAuctions);
+auctionRouter.post("/create", authenticateUser, handleCreateAuction);
+auctionRouter.get("/my-auctions", authenticateUser, handleGetMyAuctions);
 auctionRouter.get("/list", handleGetAllAuction);
 auctionRouter.get("/:id", handleGetAuctionById);
-auctionRouter.put("/:id", handleUpdateAuction);
-auctionRouter.delete("/:id", handleDeleteAuction);
+auctionRouter.put("/:id", authenticateUser, handleUpdateAuction);
+auctionRouter.delete("/:id", authenticateUser, handleDeleteAuction);
 auctionRouter.post("/place-bid", handlePlaceBid);
 // Seller actions: accept or reject highest bid
 auctionRouter.post("/:id/accept", handleAcceptBid);

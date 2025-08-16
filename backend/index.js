@@ -31,7 +31,7 @@ app.use(
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
-app.use("/api/auction", authenticateUser, auctionRouter);
+app.use("/api/auction", auctionRouter);
 app.use("/api/user", authenticateUser, userRouter);
 app.use("/api/admin", authenticateUser, adminRouter);
 

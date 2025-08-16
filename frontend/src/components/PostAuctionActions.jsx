@@ -10,6 +10,7 @@ import {
 	Activity,
 	User,
 	Award,
+	Loader,
 } from "lucide-react";
 
 const PostAuctionActions = ({
@@ -74,19 +75,19 @@ const PostAuctionActions = ({
 			isNaN(counterAmount) ||
 			parseFloat(counterAmount) <= 0
 		) {
-			toast.error("Please enter a valid counter-offer amount.");
+			toast.error("Please enter a valid Counter Offer amount.");
 			return;
 		}
 		setLoadingAction("counterOffer");
 		try {
 			const res = await axios.post(
-				`${backendUrl}/api/auction/${auction.id}/counter-offer`,
+				`${backendUrl}/api/auction/${auction.id}/Counter Offer`,
 				{ amount: parseFloat(counterAmount) },
 				{ withCredentials: true }
 			);
 			if (res.data.success)
 				toast.success(
-					`Counter-offer of ₹${parseFloat(
+					`Counter Offer of ₹${parseFloat(
 						counterAmount
 					).toLocaleString()} sent!`
 				);
@@ -110,7 +111,7 @@ const PostAuctionActions = ({
 			);
 			if (res.data.success)
 				toast.success(
-					"Counter-offer accepted. Payment confirmation sent."
+					"Counter Offer accepted. Payment confirmation sent."
 				);
 			onRefresh();
 		} catch (err) {
@@ -129,7 +130,7 @@ const PostAuctionActions = ({
 				{ withCredentials: true }
 			);
 			if (res.data.success)
-				toast.success("Counter-offer rejected. Seller notified.");
+				toast.success("Counter Offer rejected. Seller notified.");
 			onRefresh();
 		} catch (err) {
 			toast.error(err.response?.data?.message || err.message);
@@ -138,7 +139,6 @@ const PostAuctionActions = ({
 		}
 	};
 
-	// ------------------- UI Helpers ------------------- //
 	const renderButton = (onClick, variant, icon, text, loadingKey) => (
 		<Button
 			onClick={onClick}
@@ -147,7 +147,7 @@ const PostAuctionActions = ({
 			className="flex items-center gap-2 shadow-md"
 		>
 			{loadingAction === loadingKey ? (
-				<Activity className="w-4 h-4 animate-spin" />
+				<Loader className="w-4 h-4 animate-spin" />
 			) : (
 				icon
 			)}{" "}
@@ -155,7 +155,6 @@ const PostAuctionActions = ({
 		</Button>
 	);
 
-	// ------------------- Sections ------------------- //
 	const renderSellerDecisionSection = () => {
 		if (!isSeller || !hasHighestBid) return null;
 
@@ -187,13 +186,13 @@ const PostAuctionActions = ({
 						<p className="text-gray-700 mb-4 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200 font-medium">
 							<strong>Your options:</strong> Accept the bid to
 							complete the sale, reject it to end the auction, or
-							make a counter-offer. All participants will see the
+							make a Counter Offer. All participants will see the
 							status update.
 						</p>
 						<div className="flex flex-wrap gap-3">
 							{renderButton(
 								handleAcceptBid,
-								"",
+								"success",
 								<CheckCircle className="w-4 h-4" />,
 								"Accept Bid",
 								"acceptBid"
@@ -207,7 +206,7 @@ const PostAuctionActions = ({
 							)}
 							{renderButton(
 								() => setShowCounterInput(true),
-								"outline",
+								"",
 								<Activity className="w-4 h-4" />,
 								"Counter Offer",
 								"counterOffer"
@@ -223,16 +222,24 @@ const PostAuctionActions = ({
 							htmlFor="counterAmount"
 							className="text-base font-medium text-gray-700"
 						>
-							Enter Counter-Offer Amount:
+							Enter Counter Offer Amount:
 						</label>
 						<Input
 							id="counterAmount"
 							type="number"
 							value={counterAmount}
+							defaultValue={(
+								parseFloat(highestBidDetails.amount) +
+								parseFloat(auction.bidIncrement)
+							).toLocaleString()}
+							min={(
+								parseFloat(highestBidDetails.amount) +
+								parseFloat(auction.bidIncrement)
+							).toLocaleString()}
 							onChange={(e) => setCounterAmount(e.target.value)}
 							placeholder={`e.g., ${(
 								parseFloat(highestBidDetails.amount) +
-								auction.bidIncrement
+								parseFloat(auction.bidIncrement)
 							).toLocaleString()}`}
 							className="p-3 border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-lg"
 						/>
@@ -241,7 +248,7 @@ const PostAuctionActions = ({
 								handleSendCounterOffer,
 								"",
 								<Activity className="w-4 h-4" />,
-								"Send Counter-Offer",
+								"Send Counter Offer",
 								"counterOffer"
 							)}
 							<Button
@@ -260,13 +267,13 @@ const PostAuctionActions = ({
 						<AlertCircle className="w-4 h-4" />
 						<div>
 							<p>
-								Counter-offer of ₹
+								Counter Offer of ₹
 								{auction.counterOfferPrice?.toLocaleString()}{" "}
 								sent to {highestBidDetails?.bidder?.name}.
 							</p>
 							<p className="text-sm mt-1">
 								Waiting for their response. Other viewers see
-								"Counter-offer in progress".
+								"Counter Offer in progress".
 							</p>
 						</div>
 					</div>
@@ -291,11 +298,11 @@ const PostAuctionActions = ({
 			<div className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 shadow-sm">
 				<h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
 					<Activity className="w-5 h-5 text-yellow-600" />{" "}
-					Counter-Offer from Seller
+					Counter Offer from Seller
 				</h2>
 				<div className="bg-white p-4 rounded-lg mb-4 border border-yellow-200">
 					<p className="text-gray-700 mb-2">
-						The seller has made a counter-offer for:{" "}
+						The seller has made a Counter Offer for:{" "}
 						<span className="font-bold text-xl text-yellow-800">
 							₹{auction.counterOfferPrice?.toLocaleString()}
 						</span>
@@ -306,23 +313,23 @@ const PostAuctionActions = ({
 					</p>
 				</div>
 				<p className="text-gray-700 mb-5 text-sm bg-yellow-100 p-3 rounded-lg">
-					<strong>Your options:</strong> Accept the counter-offer to
+					<strong>Your options:</strong> Accept the Counter Offer to
 					complete the purchase at this price, or reject it to end the
 					auction.
 				</p>
 				<div className="flex flex-wrap gap-3">
 					{renderButton(
 						handleAcceptCounter,
-						"",
+						"success",
 						<CheckCircle className="w-4 h-4" />,
-						"Accept Counter-Offer",
+						"Accept Counter Offer",
 						"acceptCounter"
 					)}
 					{renderButton(
 						handleRejectCounter,
 						"destructive",
 						<XCircle className="w-4 h-4" />,
-						"Reject Counter-Offer",
+						"Reject Counter Offer",
 						"rejectCounter"
 					)}
 				</div>
@@ -331,8 +338,7 @@ const PostAuctionActions = ({
 	};
 
 	const renderSuccessSection = () => {
-		if (!auction.winnerId && auction.statusAfterBid !== "accepted")
-			return null;
+		if (auction.statusAfterBid !== "accepted") return null;
 
 		const isWinner = auction.winnerId === userData?.id;
 		const isSeller = auction.sellerId === userData?.id;
@@ -367,7 +373,7 @@ const PostAuctionActions = ({
 				<p className="text-green-700 mt-2 text-base text-center">
 					{userSpecificMessage}
 				</p>
-				<p className="text-green-600 mt-3 text-lg font-bold text-center">
+				<p className="text-green-600 mt-3 text-lg font-bold tracking-wider text-center">
 					Final Price: ₹
 					{auction.counterOfferPrice
 						? parseFloat(auction.counterOfferPrice).toLocaleString()
@@ -375,69 +381,50 @@ const PostAuctionActions = ({
 						? parseFloat(highestBidDetails.amount).toLocaleString()
 						: parseFloat(auction.startingPrice).toLocaleString()}
 				</p>
-				{isWinner && (
-					<div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-						<p className="text-blue-800 text-sm font-medium">
-							Next Steps:
-						</p>
-						<ul className="text-blue-700 text-sm mt-1 list-disc list-inside">
-							<li>Check your email for payment instructions</li>
-							<li>
-								Complete payment within the specified timeframe
-							</li>
-							<li>
-								You'll receive confirmation once payment is
-								processed
-							</li>
-						</ul>
-					</div>
-				)}
-				{isSeller && (
-					<div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
-						<p className="text-orange-800 text-sm font-medium">
-							What's Next:
-						</p>
-						<ul className="text-orange-700 text-sm mt-1 list-disc list-inside">
-							<li>
-								The winner has been notified and sent payment
-								instructions
-							</li>
-							<li>
-								You'll receive confirmation once they complete
-								payment
-							</li>
-							<li>
-								Prepare your item for delivery/pickup as agreed
-							</li>
-						</ul>
-					</div>
-				)}
 			</div>
 		);
 	};
 
 	const renderRejectedSection = () => {
-		if (auction.winnerId || auction.statusAfterBid !== "rejected")
-			return null;
+		if (auction.statusAfterBid !== "rejected") return null;
 
 		const isSeller = auction.sellerId === userData?.id;
 		const wasHighestBidder = userData?.id === highestBidDetails?.bidder?.id;
+		const isCounterRejected = !!auction.counterOfferPrice;
 
 		let userSpecificMessage = "";
 		let userTitle = "";
 
-		if (isSeller) {
-			userTitle = "You Rejected the Highest Bid";
-			userSpecificMessage =
-				"You have rejected the highest bid on your auction. The auction is now closed. You can consider relisting your item with different terms if desired.";
-		} else if (wasHighestBidder) {
-			userTitle = "Your Bid Was Not Accepted";
-			userSpecificMessage =
-				"The seller has decided not to accept your bid. The auction has ended without a sale. Thank you for participating!";
+		if (isCounterRejected) {
+			// Counter Offer was rejected
+			if (wasHighestBidder) {
+				userTitle = "Counter Offer Rejected";
+				userSpecificMessage =
+					"You rejected the counter offer from the seller. The auction is now closed.";
+			} else if (isSeller) {
+				userTitle = "Your Counter Offer Was Rejected";
+				userSpecificMessage =
+					"The bidder has rejected your counter offer. The auction has ended without a sale.";
+			} else {
+				userTitle = "Auction Closed - Counter Offer Rejected";
+				userSpecificMessage =
+					"A Counter offer was rejected and the auction has ended without a sale.";
+			}
 		} else {
-			userTitle = "Auction Closed - No Sale";
-			userSpecificMessage =
-				"The seller rejected the highest bid and the auction has ended without a sale. Thank you for your interest!";
+			// Original highest bid rejected
+			if (isSeller) {
+				userTitle = "You Rejected the Highest Bid";
+				userSpecificMessage =
+					"You have rejected the highest bid on your auction. The auction is now closed.";
+			} else if (wasHighestBidder) {
+				userTitle = "Your Bid Was Not Accepted";
+				userSpecificMessage =
+					"The seller has decided not to accept your bid. The auction has ended without a sale. Thank you for participating!";
+			} else {
+				userTitle = "Auction Closed - No Sale";
+				userSpecificMessage =
+					"The seller rejected the highest bid and the auction has ended without a sale. Thank you for your interest!";
+			}
 		}
 
 		return (
@@ -451,7 +438,9 @@ const PostAuctionActions = ({
 				<p className="text-red-700 mt-2 text-center">
 					{userSpecificMessage}
 				</p>
-				{highestBidDetails && (
+
+				{/* Original highest bid */}
+				{!isCounterRejected && highestBidDetails && (
 					<div className="mt-3 p-3 bg-red-100 rounded-lg">
 						<p className="text-red-800 text-sm font-medium text-center">
 							Highest bid was ₹
@@ -464,16 +453,15 @@ const PostAuctionActions = ({
 						</p>
 					</div>
 				)}
-				{isSeller && (
-					<div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-						<p className="text-blue-800 text-sm font-medium">
-							Consider:
+
+				{isCounterRejected && (isSeller || isHighestBidder) && (
+					<div className="mt-3 p-3 bg-red-200 rounded-lg">
+						<p className="text-red-900 text-sm font-medium text-center">
+							Counter Offer was ₹
+							{parseFloat(
+								auction.counterOfferPrice
+							).toLocaleString()}
 						</p>
-						<ul className="text-blue-700 text-sm mt-1 list-disc list-inside">
-							<li>Relisting with a lower starting price</li>
-							<li>Adjusting the auction duration</li>
-							<li>Improving item description or photos</li>
-						</ul>
 					</div>
 				)}
 			</div>
@@ -509,32 +497,17 @@ const PostAuctionActions = ({
 				<p className="text-gray-700 mt-2 text-center">
 					{userSpecificMessage}
 				</p>
-				{isSeller && (
-					<div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-						<p className="text-blue-800 text-sm font-medium">
-							Tips for relisting:
-						</p>
-						<ul className="text-blue-700 text-sm mt-1 list-disc list-inside">
-							<li>
-								Lower the starting price to attract more bidders
-							</li>
-							<li>Improve item photos and description</li>
-							<li>Choose peak hours for better visibility</li>
-							<li>
-								Consider shorter auction duration for urgency
-							</li>
-						</ul>
-					</div>
-				)}
 			</div>
 		);
 	};
 
 	// Helper function for viewers who are not seller or highest bidder
 	const renderViewerStatusSection = () => {
-		// Show status for viewers who are not seller or highest bidder
-		if (isSeller || isHighestBidder || !hasHighestBid) return null;
-
+		// Show status for viewers who are not seller
+		if (isSeller || !hasHighestBid) return null;
+		const isHighestBidder = highestBidDetails.bidder.id === userData.id;
+		if (isHighestBidder && auction.statusAfterBid === "countered")
+			return null;
 		let statusMessage = "";
 		let bgColor = "bg-blue-50";
 		let borderColor = "border-blue-200";
@@ -546,13 +519,33 @@ const PostAuctionActions = ({
 			statusMessage = `Auction waiting for seller decision on highest bid of ₹${highestBidDetails.amount.toLocaleString()} by ${
 				highestBidDetails.bidder.name
 			}`;
+			if (isHighestBidder) {
+				// Highest bidder sees personalized message
+				statusMessage = `You are the highest bidder with ₹${highestBidDetails.amount.toLocaleString()}. Waiting for seller decision.`;
+				bgColor = "bg-yellow-50";
+				borderColor = "border-yellow-200";
+				iconColor = "text-yellow-600";
+				titleColor = "text-yellow-900";
+				textColor = "text-yellow-700";
+			}
 		} else if (auction.statusAfterBid === "countered") {
-			statusMessage = `Seller sent a counter-offer to the highest bidder. Negotiation in progress.`;
-			bgColor = "bg-yellow-50";
-			borderColor = "border-yellow-200";
-			iconColor = "text-yellow-600";
-			titleColor = "text-yellow-900";
-			textColor = "text-yellow-700";
+			if (isHighestBidder) {
+				// Highest bidder sees personalized Counter Offer message
+				statusMessage = `Seller has made a Counter Offer of ₹${auction.counterOfferPrice?.toLocaleString()}. Please accept or reject to complete the negotiation.`;
+				bgColor = "bg-yellow-100";
+				borderColor = "border-yellow-300";
+				iconColor = "text-yellow-700";
+				titleColor = "text-yellow-900";
+				textColor = "text-yellow-800";
+			} else {
+				// Other viewers see generic message
+				statusMessage = `Seller sent a Counter Offer to the highest bidder. Negotiation in progress.`;
+				bgColor = "bg-yellow-50";
+				borderColor = "border-yellow-200";
+				iconColor = "text-yellow-600";
+				titleColor = "text-yellow-900";
+				textColor = "text-yellow-700";
+			}
 		}
 
 		if (!statusMessage) return null;

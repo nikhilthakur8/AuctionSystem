@@ -379,7 +379,7 @@ async function handlePlaceBid(req, res) {
 									<li>Your auction is attracting interest!</li>
 									<li>More bids may come in before the auction ends</li>
 									<li>You'll be notified when the auction concludes</li>
-									<li>Then you can accept, reject, or make a counter-offer</li>
+									<li>Then you can accept, reject, or make a Counter Offer</li>
 								</ul>
 							</div>
 							
@@ -745,24 +745,28 @@ async function handleCounterOffer(req, res) {
 		});
 		if (!highest)
 			return res.status(400).json({ message: "No bids to counter" });
-
-		// NEW: Update auction with counter offer details
+		if (parseFloat(amount) <= parseFloat(highest.amount))
+			return res
+				.status(400)
+				.json({
+					message:
+						"Counter offer must be higher than the highest bid",
+				});
 		auction.statusAfterBid = "countered";
-		auction.counterOfferPrice = parseFloat(amount); // Ensure it's stored as a number/decimal
-		await auction.save(); // Save the changes to the database
+		auction.counterOfferPrice = parseFloat(amount); 
+		await auction.save(); 
 
-		// Notify buyer via email about counter-offer
 		await sendEmail({
 			to: highest.bidder.email,
-			subject: `Counter-Offer Proposal: Seller has made a counter-offer of Rs.${parseFloat(
+			subject: `Counter Offer Proposal: Seller has made a Counter Offer of Rs.${parseFloat(
 				amount
 			).toLocaleString()} for ${auction.itemName} - Response Required`,
 			html: `
 				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
 					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-						<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter-Offer Received</h1>
+						<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter Offer Received</h1>
 						
-						<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">The Seller Has Made a Counter-Offer</h2>
+						<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">The Seller Has Made a Counter Offer</h2>
 						
 						<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
 							<h3 style="color: #555; margin-top: 0;">Offer Details:</h3>
@@ -770,7 +774,7 @@ async function handleCounterOffer(req, res) {
 							<p><strong>Your Original Bid:</strong> ₹${parseFloat(
 								highest.amount
 							).toLocaleString()}</p>
-							<p><strong>Seller's Counter-Offer:</strong> <span style="color: #FF9800; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+							<p><strong>Seller's Counter Offer:</strong> <span style="color: #FF9800; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
 								amount
 							).toLocaleString()}</span></p>
 							<p><strong>Seller:</strong> ${auction.seller.name}</p>
@@ -779,7 +783,7 @@ async function handleCounterOffer(req, res) {
 						<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
 							<h4 style="color: #1976D2; margin-top: 0;">Action Required:</h4>
 							<ul style="color: #333; margin: 0;">
-								<li>Please log in to your account to accept or reject this counter-offer</li>
+								<li>Please log in to your account to accept or reject this Counter Offer</li>
 								<li>You have the choice to accept the new price or decline</li>
 								<li>The seller is waiting for your response</li>
 							</ul>
@@ -787,7 +791,7 @@ async function handleCounterOffer(req, res) {
 						
 						<div style="text-align: center; margin-top: 30px;">
 							<p style="background-color: #FF9800; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold;">
-								Please respond to this counter-offer at your earliest convenience
+								Please respond to this Counter Offer at your earliest convenience
 							</p>
 						</div>
 						
@@ -798,17 +802,17 @@ async function handleCounterOffer(req, res) {
 					</div>
 				</div>
 			`,
-			text: `The seller has sent a counter-offer of ₹${parseFloat(
+			text: `The seller has sent a Counter Offer of ₹${parseFloat(
 				amount
 			).toLocaleString()} for "${
 				auction.itemName
 			}". Please log in to respond.`,
 		});
 
-		// Also notify seller that counter-offer was sent successfully
+		// Also notify seller that Counter Offer was sent successfully
 		await sendEmail({
 			to: auction.seller.email,
-			subject: `Counter-Offer Confirmation: Your counter-offer of Rs.${parseFloat(
+			subject: `Counter Offer Confirmation: Your Counter Offer of Rs.${parseFloat(
 				amount
 			).toLocaleString()} for ${
 				auction.itemName
@@ -816,17 +820,17 @@ async function handleCounterOffer(req, res) {
 			html: `
 				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
 					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-						<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter-Offer Sent</h1>
+						<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter Offer Sent</h1>
 						
-						<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Counter-Offer Has Been Delivered</h2>
+						<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Counter Offer Has Been Delivered</h2>
 						
 						<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-							<h3 style="color: #555; margin-top: 0;">Counter-Offer Details:</h3>
+							<h3 style="color: #555; margin-top: 0;">Counter Offer Details:</h3>
 							<p><strong>Item:</strong> ${auction.itemName}</p>
 							<p><strong>Original Bid:</strong> ₹${parseFloat(
 								highest.amount
 							).toLocaleString()}</p>
-							<p><strong>Your Counter-Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+							<p><strong>Your Counter Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
 								amount
 							).toLocaleString()}</span></p>
 							<p><strong>Bidder:</strong> ${highest.bidder.name} (${highest.bidder.email})</p>
@@ -836,7 +840,7 @@ async function handleCounterOffer(req, res) {
 							<h4 style="color: #1976D2; margin-top: 0;">What Happens Next:</h4>
 							<ul style="color: #333; margin: 0;">
 								<li>The bidder has been notified via email</li>
-								<li>They will log in to accept or reject your counter-offer</li>
+								<li>They will log in to accept or reject your Counter Offer</li>
 								<li>You'll be notified immediately of their decision</li>
 								<li>If accepted, both parties will receive confirmation and invoice</li>
 							</ul>
@@ -859,18 +863,18 @@ async function handleCounterOffer(req, res) {
 			counterAmount: amount,
 			originalBid: parseFloat(highest.amount),
 			bidderName: highest.bidder.name,
-			sellerMessage: `You sent a counter-offer of ₹${amount.toLocaleString()} to ${
+			sellerMessage: `You sent a Counter Offer of ₹${amount.toLocaleString()} to ${
 				highest.bidder.name
 			}`,
-			bidderMessage: `Seller sent you a counter-offer of ₹${amount.toLocaleString()} (original bid: ₹${parseFloat(
+			bidderMessage: `Seller sent you a Counter Offer of ₹${amount.toLocaleString()} (original bid: ₹${parseFloat(
 				highest.amount
 			).toLocaleString()})`,
-			viewerMessage: `Seller sent a counter-offer of ₹${amount.toLocaleString()} to the highest bidder`,
+			viewerMessage: `Seller sent a Counter Offer of ₹${amount.toLocaleString()} to the highest bidder`,
 		});
 
-		res.json({ success: true, message: "Counter-offer sent", amount });
+		res.json({ success: true, message: "Counter Offer sent", amount });
 	} catch (error) {
-		console.error("Error sending counter-offer:", error);
+		console.error("Error sending Counter Offer:", error);
 		res.status(500).json({ message: error.message });
 	}
 }
@@ -903,7 +907,7 @@ async function handleCounterResponse(req, res) {
 		) {
 			return res.status(403).json({
 				message:
-					"Forbidden: Not eligible to respond to this counter-offer.",
+					"Forbidden: Not eligible to respond to this Counter Offer.",
 			});
 		}
 
@@ -927,7 +931,7 @@ async function handleCounterResponse(req, res) {
 			// Send confirmation emails to both buyer and seller with invoice
 			await sendEmail({
 				to: req.user.email,
-				subject: `Purchase Confirmed: Counter-offer accepted for ${
+				subject: `Purchase Confirmed: Counter Offer accepted for ${
 					auction.itemName
 				} at Rs.${parseFloat(
 					counterOfferAmount
@@ -937,7 +941,7 @@ async function handleCounterResponse(req, res) {
 						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
 							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Congratulations! You Won!</h1>
 							
-							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Counter-Offer Accepted Successfully</h2>
+							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Counter Offer Accepted Successfully</h2>
 							
 							<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
 								<h3 style="color: #555; margin-top: 0;">Final Transaction Details:</h3>
@@ -945,7 +949,7 @@ async function handleCounterResponse(req, res) {
 								<p><strong>Original Bid:</strong> ₹${parseFloat(
 									highestBid.amount
 								).toLocaleString()}</p>
-								<p><strong>Seller's Counter-Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								<p><strong>Seller's Counter Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
 									counterOfferAmount
 								).toLocaleString()}</span></p>
 								<p><strong>Seller:</strong> ${auction.seller.name} (${auction.seller.email})</p>
@@ -981,7 +985,7 @@ async function handleCounterResponse(req, res) {
 			// Notify seller via email
 			await sendEmail({
 				to: auction.seller.email,
-				subject: `Sale Finalized: Your counter-offer for ${
+				subject: `Sale Finalized: Your Counter Offer for ${
 					auction.itemName
 				} has been accepted at Rs.${parseFloat(
 					counterOfferAmount
@@ -989,7 +993,7 @@ async function handleCounterResponse(req, res) {
 				html: `
 					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
 						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter-Offer Accepted!</h1>
+							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter Offer Accepted!</h1>
 							
 							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Item Has Been Sold</h2>
 							
@@ -999,7 +1003,7 @@ async function handleCounterResponse(req, res) {
 								<p><strong>Original Bid:</strong> ₹${parseFloat(
 									highestBid.amount
 								).toLocaleString()}</p>
-								<p><strong>Your Counter-Offer (ACCEPTED):</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								<p><strong>Your Counter Offer (ACCEPTED):</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
 									counterOfferAmount
 								).toLocaleString()}</span></p>
 								<p><strong>Buyer:</strong> ${req.user.name} (${req.user.email})</p>
@@ -1037,13 +1041,13 @@ async function handleCounterResponse(req, res) {
 				amount: parseFloat(counterOfferAmount),
 				winnerId: req.user.id,
 				winnerName: req.user.name,
-				sellerMessage: `Your counter-offer of ₹${parseFloat(
+				sellerMessage: `Your Counter Offer of ₹${parseFloat(
 					counterOfferAmount
 				).toLocaleString()} has been accepted by ${req.user.name}`,
-				winnerMessage: `You accepted the counter-offer of ₹${parseFloat(
+				winnerMessage: `You accepted the Counter Offer of ₹${parseFloat(
 					counterOfferAmount
 				).toLocaleString()}. Payment details sent via email.`,
-				viewerMessage: `Counter-offer accepted! Final price: ₹${parseFloat(
+				viewerMessage: `Counter Offer accepted! Final price: ₹${parseFloat(
 					counterOfferAmount
 				).toLocaleString()}`,
 			});
@@ -1061,16 +1065,16 @@ async function handleCounterResponse(req, res) {
 
 			await auction.save();
 
-			// Notify seller via email about counter-offer rejection
+			// Notify seller via email about Counter Offer rejection
 			await sendEmail({
 				to: auction.seller.email,
-				subject: `Counter-Offer Response: Your counter-offer for ${auction.itemName} was declined by the bidder`,
+				subject: `Counter Offer Response: Your Counter Offer for ${auction.itemName} was declined by the bidder`,
 				html: `
 					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
 						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-							<h1 style="color: #f44336; text-align: center; margin-bottom: 30px;">Counter-Offer Rejected</h1>
+							<h1 style="color: #f44336; text-align: center; margin-bottom: 30px;">Counter Offer Rejected</h1>
 							
-							<h2 style="color: #333; border-bottom: 2px solid #f44336; padding-bottom: 10px;">Unfortunately, Your Counter-Offer Was Declined</h2>
+							<h2 style="color: #333; border-bottom: 2px solid #f44336; padding-bottom: 10px;">Unfortunately, Your Counter Offer Was Declined</h2>
 							
 							<div style="background-color: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f44336;">
 								<h3 style="color: #555; margin-top: 0;">Rejected Offer Details:</h3>
@@ -1078,7 +1082,7 @@ async function handleCounterResponse(req, res) {
 								<p><strong>Original Bid:</strong> ₹${parseFloat(
 									highestBid.amount
 								).toLocaleString()}</p>
-								<p><strong>Your Counter-Offer:</strong> ₹${parseFloat(
+								<p><strong>Your Counter Offer:</strong> ₹${parseFloat(
 									counterOfferAmount
 								).toLocaleString()}</p>
 								<p><strong>Bidder:</strong> ${highestBid.bidder.name}</p>
@@ -1097,7 +1101,7 @@ async function handleCounterResponse(req, res) {
 						</div>
 					</div>
 				`,
-				text: `Unfortunately, your counter-offer of ₹${parseFloat(
+				text: `Unfortunately, your Counter Offer of ₹${parseFloat(
 					counterOfferAmount
 				).toLocaleString()} for "${auction.itemName}" was rejected by ${
 					highestBid.bidder.name
@@ -1107,13 +1111,13 @@ async function handleCounterResponse(req, res) {
 			// Also notify buyer confirming their rejection
 			await sendEmail({
 				to: req.user.email,
-				subject: `Action Confirmed: You have declined the counter-offer for ${auction.itemName} - Auction Closed`,
+				subject: `Action Confirmed: You have declined the Counter Offer for ${auction.itemName} - Auction Closed`,
 				html: `
 					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
 						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-							<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter-Offer Rejected</h1>
+							<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter Offer Rejected</h1>
 							
-							<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">Counter-Offer Successfully Declined</h2>
+							<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">Counter Offer Successfully Declined</h2>
 							
 							<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
 								<h3 style="color: #555; margin-top: 0;">Rejection Details:</h3>
@@ -1121,7 +1125,7 @@ async function handleCounterResponse(req, res) {
 								<p><strong>Your Original Bid:</strong> ₹${parseFloat(
 									highestBid.amount
 								).toLocaleString()}</p>
-								<p><strong>Seller's Counter-Offer:</strong> ₹${parseFloat(
+								<p><strong>Seller's Counter Offer:</strong> ₹${parseFloat(
 									counterOfferAmount
 								).toLocaleString()}</p>
 								<p><strong>Your Decision:</strong> <span style="color: #f44336; font-weight: bold;">Rejected</span></p>
@@ -1145,13 +1149,13 @@ async function handleCounterResponse(req, res) {
 				auctionId: auction.id,
 				counterAmount: parseFloat(auction.counterOfferPrice),
 				rejectedBy: req.user.name,
-				sellerMessage: `Your counter-offer of ₹${parseFloat(
+				sellerMessage: `Your Counter Offer of ₹${parseFloat(
 					auction.counterOfferPrice
 				).toLocaleString()} was rejected by ${req.user.name}`,
-				bidderMessage: `You rejected the counter-offer of ₹${parseFloat(
+				bidderMessage: `You rejected the Counter Offer of ₹${parseFloat(
 					auction.counterOfferPrice
 				).toLocaleString()}`,
-				viewerMessage: `Counter-offer of ₹${parseFloat(
+				viewerMessage: `Counter Offer of ₹${parseFloat(
 					auction.counterOfferPrice
 				).toLocaleString()} was rejected. Auction ended with no sale.`,
 			});
@@ -1159,7 +1163,7 @@ async function handleCounterResponse(req, res) {
 			res.json({ success: true, message: "Counter Offer rejected" });
 		}
 	} catch (error) {
-		console.error("Error responding to counter-offer:", error);
+		console.error("Error responding to Counter Offer:", error);
 		res.status(500).json({ message: error.message });
 	}
 }

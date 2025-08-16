@@ -68,4 +68,13 @@ async function handleLogin(req, res) {
 	}
 }
 
-module.exports = { handleRegister, handleLogin };
+async function handleLogout(req, res) {
+	try {
+		res.clearCookie("SESSION_ID");
+		return res.json({ success: true });
+	} catch (error) {
+		res.status(500).json({ message: error.message });
+	}
+}
+
+module.exports = { handleRegister, handleLogin, handleLogout };

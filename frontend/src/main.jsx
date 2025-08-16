@@ -19,6 +19,7 @@ import MyAuctions from "./Pages/Auctions/MyAuctions";
 import AuctionPage from "./Pages/Auctions/AuctionPage";
 import LiveAuction from "./Pages/Auctions/LiveAuction";
 import AdminPanel from "./Pages/Admin/AdminPanel";
+import { ProtectedLayout } from "./Layout/ProtectedLayout";
 
 const router = createBrowserRouter(
 	createRoutesFromElements(
@@ -32,13 +33,14 @@ const router = createBrowserRouter(
 			{/* Main Layout */}
 			<Route element={<MainLayout />}>
 				<Route path="/" element={<Home />} />
-				<Route path="/create-auction" element={<CreateAuction />} />
+				<Route element={<ProtectedLayout />}>
+					<Route path="/create-auction" element={<CreateAuction />} />
+					<Route path="/auction/:id" element={<AuctionPage />} />
+					<Route path="/my-auctions" element={<MyAuctions />} />
+					<Route path="/auction/live/:id" element={<LiveAuction />} />
+					<Route path="/admin" element={<AdminPanel />} />
+				</Route>
 				<Route path="/auctions" element={<Auctions />} />
-				<Route path="/my-auctions" element={<MyAuctions />} />
-				<Route path="/auction/:id" element={<AuctionPage />} />
-				<Route path="/auction/edit/:id" element={<AuctionPage />} />
-				<Route path="/auction/live/:id" element={<LiveAuction />} />
-				<Route path="/admin" element={<AdminPanel />} />
 			</Route>
 		</Route>
 	)
