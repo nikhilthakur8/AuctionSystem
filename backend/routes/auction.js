@@ -28,4 +28,6 @@ auctionRouter.post("/:id/reject", handleRejectBid);
 auctionRouter.post("/:id/counter-offer", handleCounterOffer);
 // Counter-response by bidder
 auctionRouter.post("/:id/counter-response", handleCounterResponse);
+// Invoice generation
+auctionRouter.get("/:id/invoice", handleGetInvoice);
 module.exports = auctionRouter;

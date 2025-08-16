@@ -29,6 +29,9 @@ const Navbar = () => {
 							<Link to="/create-auction">Create Auction</Link>
 						)}
 						{userData && <Link to="/my-auctions">My Auctions</Link>}
+						{userData && userData.role === "admin" && (
+							<Link to="/admin">Admin Panel</Link>
+						)}
 					</div>
 
 					{/* Auth buttons */}

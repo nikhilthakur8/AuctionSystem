@@ -18,6 +18,7 @@ import CreateAuction from "./Pages/Auctions/CreateAuction";
 import MyAuctions from "./Pages/Auctions/MyAuctions";
 import AuctionPage from "./Pages/Auctions/AuctionPage";
 import LiveAuction from "./Pages/Auctions/LiveAuction";
+import AdminPanel from "./Pages/Admin/AdminPanel";
 
 const router = createBrowserRouter(
 	createRoutesFromElements(
@@ -37,6 +38,7 @@ const router = createBrowserRouter(
 				<Route path="/auction/:id" element={<AuctionPage />} />
 				<Route path="/auction/edit/:id" element={<AuctionPage />} />
 				<Route path="/auction/live/:id" element={<LiveAuction />} />
+				<Route path="/admin" element={<AdminPanel />} />
 			</Route>
 		</Route>
 	)

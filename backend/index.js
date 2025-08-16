@@ -8,6 +8,7 @@ const db = require("./models");
 const authRouter = require("./routes/auth");
 const userRouter = require("./routes/user");
 const auctionRouter = require("./routes/auction");
+const adminRouter = require("./routes/admin");
 const authenticateUser = require("./middleware/authenticate");
 const { initSocket } = require("./sockets/io");
 const cookieParser = require("cookie-parser");
@@ -32,6 +33,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/auction", authenticateUser, auctionRouter);
 app.use("/api/user", authenticateUser, userRouter);
+app.use("/api/admin", authenticateUser, adminRouter);
 
 db.sequelize.sync({ alter: true }).then(() => {
 	server.listen(process.env.PORT, () => console.log("Server running"));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,12 @@ import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { Zap, Bell, Clock, Gavel, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUserContext } from "../../context/context";
 
 const LiveAuction = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
+	const { userData } = useUserContext();
 	const [auction, setAuction] = useState(null);
 	const [currentBid, setCurrentBid] = useState(0);
 	const [newBid, setNewBid] = useState(0);
@@ -73,8 +75,6 @@ const LiveAuction = () => {
 				setTimeLeft(`${hrs}h ${mins}m ${secs}s remaining`);
 			} else {
 				// Auction ended — redirect and show toast
-				toast.error("Bidding has ended");
-				navigate("/", { replace: true });
 			}
 		};
 
@@ -83,37 +83,121 @@ const LiveAuction = () => {
 		return () => clearInterval(timer);
 	}, [auction, navigate]);
 
-	// WebSocket for live bids
+	// WebSocket for live bids with user-specific messages
 	useEffect(() => {
-		if (!auction || !id) return;
+		if (!auction || !id || !userData) return;
 		const newSocket = io(backendUrl);
 		setSocket(newSocket);
 		newSocket.emit("joinAuctionRoom", id);
+
+		// Helper function to get user-specific message
+		const getUserSpecificMessage = (data) => {
+			if (userData.id === data.bidderId) {
+				return data.bidderMessage || data.message;
+			} else if (userData.id === data.sellerId) {
+				return data.sellerMessage || data.message;
+			} else {
+				return data.viewerMessage || data.message;
+			}
+		};
 
 		newSocket.on("bidUpdated", (data) => {
 			const bidValue = parseFloat(data.bid) || 0;
 			setCurrentBid(bidValue);
 			setNewBid(bidValue + parseFloat(auction.bidIncrement));
 
+			const userMessage = getUserSpecificMessage(data);
 			const notification = {
 				id: Date.now(),
-				message: data.message,
+				message: userMessage,
 				timestamp: new Date().toLocaleTimeString(),
 			};
 			setNotifications((prev) => [notification, ...prev].slice(0, 20));
-			toast.success(data.message);
+			toast.success(userMessage);
+		});
+
+		newSocket.on("bidAccepted", (data) => {
+			const userMessage = getUserSpecificMessage(data);
+			const notification = {
+				id: Date.now(),
+				message: userMessage,
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			setNotifications((prev) => [notification, ...prev].slice(0, 20));
+			toast.success(userMessage);
+			// Redirect to auction page after a delay to show the message
+			setTimeout(() => navigate(`/auction/${id}`), 2000);
+		});
+
+		newSocket.on("bidRejected", (data) => {
+			const userMessage = getUserSpecificMessage(data);
+			const notification = {
+				id: Date.now(),
+				message: userMessage,
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			setNotifications((prev) => [notification, ...prev].slice(0, 20));
+			toast.error(userMessage);
+			// Redirect to auction page after a delay
+			setTimeout(() => navigate(`/auction/${id}`), 2000);
+		});
+
+		newSocket.on("counterOffer", (data) => {
+			const userMessage = getUserSpecificMessage(data);
+			const notification = {
+				id: Date.now(),
+				message: userMessage,
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			setNotifications((prev) => [notification, ...prev].slice(0, 20));
+			toast.info(userMessage);
+			// Redirect to auction page to handle counter-offer
+			setTimeout(() => navigate(`/auction/${id}`), 2000);
+		});
+
+		newSocket.on("counterAccepted", (data) => {
+			const userMessage = getUserSpecificMessage(data);
+			const notification = {
+				id: Date.now(),
+				message: userMessage,
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			setNotifications((prev) => [notification, ...prev].slice(0, 20));
+			toast.success(userMessage);
+			// Redirect to auction page after a delay
+			setTimeout(() => navigate(`/auction/${id}`), 2000);
+		});
+
+		newSocket.on("counterRejected", (data) => {
+			const userMessage = getUserSpecificMessage(data);
+			const notification = {
+				id: Date.now(),
+				message: userMessage,
+				timestamp: new Date().toLocaleTimeString(),
+			};
+			setNotifications((prev) => [notification, ...prev].slice(0, 20));
+			toast.error(userMessage);
+			// Redirect to auction page after a delay
+			setTimeout(() => navigate(`/auction/${id}`), 2000);
 		});
 
 		newSocket.on("auction-ended", (highestBid) => {
 			const bidValue = parseFloat(highestBid) || 0;
 			setCurrentBid(bidValue);
-			toast(`Auction ended. Highest bid: ₹${bidValue.toLocaleString()}`);
+			const message = `Auction ended. ${
+				bidValue > 0
+					? `Highest bid: ₹${bidValue.toLocaleString()}`
+					: "No bids received"
+			}`;
+			toast.info(message);
+			// Redirect to auction page to see results
+			setTimeout(() => navigate(`/auction/${id}`), 3000);
 		});
 
 		return () => {
 			newSocket.disconnect();
 		};
-	}, [auction, id, backendUrl]);
+	}, [auction, id, backendUrl, userData, navigate]);
 
 	const placeBid = async () => {
 		if (newBid <= currentBid) {
@@ -170,7 +254,7 @@ const LiveAuction = () => {
 			</div>
 		);
 	}
-
+	console.log(timeLeft);
 	return (
 		<div className="min-h-screen py-20 px-10 bg-gray-50 grid grid-cols-1 md:grid-cols-4">
 			{/* Auction Info */}
@@ -180,11 +264,18 @@ const LiveAuction = () => {
 						<h1 className="text-4xl font-bold text-gray-900">
 							{auction.itemName}
 						</h1>
-						<div className="flex items-center justify-center gap-4">
-							<span className="inline-flex items-center text-gray-600">
-								<Clock className="w-4 h-4 mr-1" /> {timeLeft}
-							</span>
-						</div>
+						{timeLeft ? (
+							<div className="flex items-center justify-center gap-4">
+								<span className="inline-flex items-center text-gray-600">
+									<Clock className="w-4 h-4 mr-1" />{" "}
+									{timeLeft}
+								</span>
+							</div>
+						) : (
+							<div className="flex items-center justify-center gap-4">
+								Bid has Ended
+							</div>
+						)}
 					</div>
 
 					<div className="bg-white p-8 rounded-xl shadow-lg space-y-8">
@@ -208,7 +299,7 @@ const LiveAuction = () => {
 								disabled={
 									currentBid +
 										parseFloat(auction.bidIncrement) ===
-									newBid
+										newBid || !timeLeft
 								}
 								className="w-16 h-16 text-3xl rounded-full"
 								variant="outline"
@@ -228,6 +319,7 @@ const LiveAuction = () => {
 											parseFloat(auction.bidIncrement)
 									)
 								}
+								disabled={!timeLeft}
 								className="w-16 h-16 text-3xl rounded-full"
 								variant="outline"
 								size="icon"
@@ -239,6 +331,7 @@ const LiveAuction = () => {
 						<Button
 							onClick={placeBid}
 							className="w-full py-6 text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+							disabled={!timeLeft}
 						>
 							<Zap className="w-5 h-5 mr-2" /> Place Bid
 						</Button>

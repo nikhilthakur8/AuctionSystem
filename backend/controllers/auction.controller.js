@@ -1,8 +1,10 @@
-const { Auction, Bid } = require("../models");
+const { Auction, Bid, User } = require("../models");
 
 const { auctionSchema } = require("../validations/auction");
 const { redis } = require("../config/redis");
 const sendEmail = require("../utils/sendEmail");
+const { getIO } = require("../sockets/io");
+const PDFDocument = require("pdfkit");
 async function handleCreateAuction(req, res) {
 	try {
 		const {
@@ -213,9 +215,6 @@ async function handleGetMyAuctions(req, res) {
 	}
 }
 
-const { getIO } = require("../sockets/io");
-const PDFDocument = require("pdfkit");
-const { User } = require("../models");
 async function handlePlaceBid(req, res) {
 	const { auctionId, amount, socketId } = req.body;
 
@@ -232,6 +231,14 @@ async function handlePlaceBid(req, res) {
 			return res
 				.status(400)
 				.json({ message: "Auction has not started yet" });
+		}
+		if (
+			currentTime >
+			new Date(auctionStartTime.getTime() + auction.duration * 60000)
+		) {
+			return res
+				.status(400)
+				.json({ message: "Auction has already ended" });
 		}
 
 		// Get current highest bid from Redis
@@ -275,11 +282,146 @@ async function handlePlaceBid(req, res) {
 
 		// Broadcast to all in the auction room
 		const io = getIO();
+
+		// Notify previous highest bidder they've been outbid
+		if (
+			highestBidderData.name &&
+			highestBidderData.email !== req.user.email
+		) {
+			io.to(auctionId).emit("outbid", {
+				previousBidder: highestBidderData.email,
+				message: `You have been outbid! New highest bid: ₹${amount.toLocaleString()}`,
+				newAmount: amount,
+			});
+
+			// Send email notification to outbid user
+			await sendEmail({
+				to: highestBidderData.email,
+				subject: `Auction Update: Your bid has been outbid for ${auction.itemName} - Action Required`,
+				html: `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+						<h1 style="color: #FF5722; text-align: center; margin-bottom: 30px;">You've Been Outbid</h1>
+						
+						<h2 style="color: #333; border-bottom: 2px solid #FF5722; padding-bottom: 10px;">Someone Placed a Higher Bid</h2>							<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FF9800;">
+								<h3 style="color: #555; margin-top: 0;">Bid Update:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Your Previous Bid:</strong> ₹${parseFloat(
+									highestBidderData.amount
+								).toLocaleString()}</p>
+								<p><strong>New Highest Bid:</strong> <span style="color: #FF5722; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+									amount
+								).toLocaleString()}</span></p>
+								<p><strong>New Bidder:</strong> ${req.user.name}</p>
+							</div>
+							
+							<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">Don't Give Up!</h4>
+								<p style="color: #333; margin: 10px 0 0 0;">The auction is still active. You can place a higher bid to regain the lead!</p>
+							</div>
+							
+						<div style="text-align: center; margin-top: 30px;">
+							<div style="background-color: #FF5722; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold;">
+								Auction Still Active - Bid Now to Win!
+							</div>
+						</div>							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for participating in our auction!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+				text: `You've been outbid on "${
+					auction.itemName
+				}"! New highest bid: ₹${parseFloat(
+					amount
+				).toLocaleString()} by ${
+					req.user.name
+				}. The auction is still active - place a higher bid to win!`,
+			});
+		}
+
+		// Notify seller of new bid via email
+		const seller = await User.findByPk(auction.sellerId);
+		if (seller && seller.email !== req.user.email) {
+			await sendEmail({
+				to: seller.email,
+				subject: `New Bid Alert: ${
+					auction.itemName
+				} received a bid of Rs.${parseFloat(
+					amount
+				).toLocaleString()} from ${req.user.name}`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">New Bid Received</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Great News! Your Auction is Getting Attention</h2>
+							
+							<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+								<h3 style="color: #555; margin-top: 0;">New Bid Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Starting Price:</strong> ₹${parseFloat(
+									auction.startingPrice
+								).toLocaleString()}</p>
+								<p><strong>New Bid Amount:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+									amount
+								).toLocaleString()}</span></p>
+								<p><strong>Bidder:</strong> ${req.user.name}</p>
+								<p><strong>Increase from Starting Price:</strong> +₹${parseFloat(
+									amount - auction.startingPrice
+								).toLocaleString()}</p>
+							</div>
+							
+							<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">What's Next:</h4>
+								<ul style="color: #333; margin: 0;">
+									<li>Your auction is attracting interest!</li>
+									<li>More bids may come in before the auction ends</li>
+									<li>You'll be notified when the auction concludes</li>
+									<li>Then you can accept, reject, or make a counter-offer</li>
+								</ul>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+				text: `New bid received on your auction "${
+					auction.itemName
+				}"! Bid amount: ₹${parseFloat(amount).toLocaleString()} by ${
+					req.user.name
+				}.`,
+			});
+		}
+
+		// Notify seller of new bid
+		io.to(auctionId).emit("newBidNotification", {
+			seller: auction.sellerId,
+			message: `New bid placed: ₹${amount.toLocaleString()} by ${
+				req.user.name
+			}`,
+			bidder: req.user.name,
+			amount: amount,
+		});
+
+		// Broadcast bid update to all participants with clear messages for different user types
 		io.to(auctionId).emit("bidUpdated", {
 			...newBidderData,
-			message: `New highest bid by ${
+			message: `New highest bid: ₹${amount.toLocaleString()}`,
+			bidderMessage: `Your bid of ₹${amount.toLocaleString()} is now the highest!`,
+			sellerMessage: `New bid received: ₹${amount.toLocaleString()} from ${
 				req.user.name
-			}: ₹${amount.toLocaleString()}`,
+			}`,
+			viewerMessage: `New highest bid: ₹${amount.toLocaleString()} by ${
+				req.user.name
+			}`,
+			bidderName: req.user.name,
+			bidderId: req.user.id,
+			sellerId: auction.sellerId,
 		});
 
 		res.json({
@@ -324,13 +466,115 @@ async function handleAcceptBid(req, res) {
 		auction.highestBidId = highest.id; // Set highestBidId
 		await auction.save();
 
-		// Notify via email
+		// Generate PDF invoice
+		const pdfData = await generateInvoicePDF(
+			auction,
+			highest.bidder,
+			auction.seller
+		);
+
+		// Send confirmation email to both buyer and seller with invoice attachment
+		const finalPrice = auction.counterOfferPrice || highest.amount;
+
+		// Send email to buyer
 		await sendEmail({
 			to: highest.bidder.email,
-			subject: "Your bid has been accepted!",
-			text: `Congratulations! Your bid of ₹${parseFloat(
-				highest.amount
-			).toLocaleString()} for "${auction.itemName}" has been accepted.`,
+			subject: `Auction Won: Your bid for ${auction.itemName} has been accepted - Payment and Invoice Details Enclosed`,
+			html: `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+						<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Congratulations!</h1>
+						
+						<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Bid Has Been Accepted</h2>
+						
+						<div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+							<h3 style="color: #555; margin-top: 0;">Transaction Details:</h3>
+							<p><strong>Item:</strong> ${auction.itemName}</p>
+							<p><strong>Description:</strong> ${auction.description || "N/A"}</p>
+							<p><strong>Final Price:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								finalPrice
+							).toLocaleString()}</span></p>
+							<p><strong>Seller:</strong> ${auction.seller.name}</p>
+						</div>
+						
+						<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+							<h4 style="color: #1976D2; margin-top: 0;">Next Steps:</h4>
+							<ul style="color: #333; margin: 0;">
+								<li>Please check the attached invoice for complete transaction details</li>
+								<li>The seller will contact you soon for payment and delivery arrangements</li>
+								<li>Keep this email for your records</li>
+							</ul>
+						</div>
+						
+						<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+							<p>Thank you for using our auction platform!</p>
+							<p style="color: #999;">This is an automated email. Please do not reply.</p>
+						</div>
+					</div>
+				</div>
+			`,
+			attachments: [
+				{
+					filename: `invoice-${auction.id}.pdf`,
+					content: pdfData.toString("base64"),
+					type: "application/pdf",
+					disposition: "attachment",
+				},
+			],
+		});
+
+		// Send email to seller
+		await sendEmail({
+			to: auction.seller.email,
+			subject: `Sale Completed: Your auction for ${
+				auction.itemName
+			} has been sold for Rs.${parseFloat(
+				finalPrice
+			).toLocaleString()} - Invoice and Details Enclosed`,
+			html: `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+						<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Auction Sold!</h1>
+						
+						<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">Your Item Has Been Sold</h2>
+						
+						<div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+							<h3 style="color: #555; margin-top: 0;">Sale Details:</h3>
+							<p><strong>Item:</strong> ${auction.itemName}</p>
+							<p><strong>Starting Price:</strong> ₹${parseFloat(
+								auction.startingPrice
+							).toLocaleString()}</p>
+							<p><strong>Final Sale Price:</strong> <span style="color: #FF9800; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								finalPrice
+							).toLocaleString()}</span></p>
+							<p><strong>Buyer:</strong> ${highest.bidder.name} (${highest.bidder.email})</p>
+						</div>
+						
+						<div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+							<h4 style="color: #2E7D32; margin-top: 0;">Next Steps:</h4>
+							<ul style="color: #333; margin: 0;">
+								<li>The buyer has been notified and will contact you for payment</li>
+								<li>Please arrange delivery once payment is confirmed</li>
+								<li>Invoice attached for your records</li>
+								<li>Congratulations on your successful sale!</li>
+							</ul>
+						</div>
+						
+						<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+							<p>Thank you for using our auction platform!</p>
+							<p style="color: #999;">This is an automated email. Please do not reply.</p>
+						</div>
+					</div>
+				</div>
+			`,
+			attachments: [
+				{
+					filename: `invoice-${auction.id}.pdf`,
+					content: pdfData.toString("base64"),
+					type: "application/pdf",
+					disposition: "attachment",
+				},
+			],
 		});
 
 		const io = getIO();
@@ -338,6 +582,17 @@ async function handleAcceptBid(req, res) {
 			auctionId: auction.id,
 			amount: parseFloat(highest.amount),
 			winnerId: highest.bidder.id,
+			winnerName: highest.bidder.name,
+			sellerMessage: `You accepted the bid of ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} from ${highest.bidder.name}`,
+			winnerMessage: `Congratulations! Your bid of ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} has been accepted by the seller`,
+			viewerMessage: `Auction completed! Winning bid: ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} by ${highest.bidder.name}`,
+			sellerName: auction.seller.name,
 		});
 
 		res.json({
@@ -354,7 +609,10 @@ async function handleAcceptBid(req, res) {
 async function handleRejectBid(req, res) {
 	try {
 		const auction = await Auction.findByPk(req.params.id, {
-			include: [{ model: Bid, as: "bids" }],
+			include: [
+				{ model: Bid, as: "bids" },
+				{ model: User, as: "seller" },
+			],
 		});
 		if (!auction)
 			return res.status(404).json({ message: "Auction not found" });
@@ -371,17 +629,97 @@ async function handleRejectBid(req, res) {
 		auction.statusAfterBid = "rejected";
 		await auction.save();
 
-		// Notify via email
+		// Notify via email with proper HTML formatting
 		if (highest) {
 			await sendEmail({
 				to: highest.bidder.email,
-				subject: "Your bid was rejected",
-				text: `Sorry, your bid of ₹${highest.amount} for "${auction.itemName}" was rejected by the seller.`,
+				subject: `Auction Result: Your bid for ${auction.itemName} was not accepted by the seller`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #f44336; text-align: center; margin-bottom: 30px;">Bid Rejected</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #f44336; padding-bottom: 10px;">Unfortunately, Your Bid Was Not Accepted</h2>
+							
+							<div style="background-color: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f44336;">
+								<h3 style="color: #555; margin-top: 0;">Bid Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Your Bid Amount:</strong> ₹${parseFloat(
+									highest.amount
+								).toLocaleString()}</p>
+								<p><strong>Status:</strong> <span style="color: #f44336; font-weight: bold;">Rejected by Seller</span></p>
+							</div>
+							
+							<div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">Don't Give Up!</h4>
+								<p style="color: #333; margin: 10px 0 0 0;">Keep browsing our platform for other exciting auctions. Better luck next time!</p>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for participating in our auction!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+				text: `Sorry, your bid of ₹${parseFloat(
+					highest.amount
+				).toLocaleString()} for "${
+					auction.itemName
+				}" was rejected by the seller.`,
+			});
+
+			// Also send notification email to seller confirming the rejection
+			await sendEmail({
+				to: auction.seller.email,
+				subject: `Action Confirmed: You have successfully rejected the bid for ${auction.itemName}`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Bid Rejection Confirmed</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">Bid Successfully Rejected</h2>
+							
+							<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+								<h3 style="color: #555; margin-top: 0;">Rejection Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Rejected Bid:</strong> ₹${parseFloat(
+									highest.amount
+								).toLocaleString()}</p>
+								<p><strong>Bidder:</strong> ${highest.bidder.name}</p>
+								<p><strong>Status:</strong> <span style="color: #f44336; font-weight: bold;">Auction Closed - No Winner</span></p>
+							</div>
+							
+							<div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+								<h4 style="color: #2E7D32; margin-top: 0;">Next Steps:</h4>
+								<p style="color: #333; margin: 10px 0 0 0;">The bidder has been notified. You can create a new auction with different terms if desired.</p>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
 			});
 		}
 
 		const io = getIO();
-		io.to(auction.id).emit("bidRejected", { auctionId: auction.id });
+		io.to(auction.id).emit("bidRejected", {
+			auctionId: auction.id,
+			rejectedAmount: parseFloat(highest.amount),
+			rejectedBidderName: highest.bidder.name,
+			sellerMessage: `You rejected the bid of ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} from ${highest.bidder.name}`,
+			bidderMessage: `Your bid of ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} was not accepted by the seller`,
+			viewerMessage: `Auction ended - highest bid of ₹${parseFloat(
+				highest.amount
+			).toLocaleString()} was not accepted`,
+		});
 
 		res.json({ success: true, message: "Bid rejected" });
 	} catch (error) {
@@ -392,7 +730,9 @@ async function handleRejectBid(req, res) {
 async function handleCounterOffer(req, res) {
 	const { amount } = req.body;
 	try {
-		const auction = await Auction.findByPk(req.params.id);
+		const auction = await Auction.findByPk(req.params.id, {
+			include: [{ model: User, as: "seller" }],
+		});
 		if (!auction)
 			return res.status(404).json({ message: "Auction not found" });
 		if (auction.sellerId !== req.user.id)
@@ -411,11 +751,104 @@ async function handleCounterOffer(req, res) {
 		auction.counterOfferPrice = parseFloat(amount); // Ensure it's stored as a number/decimal
 		await auction.save(); // Save the changes to the database
 
-		// Notify via email
+		// Notify buyer via email about counter-offer
 		await sendEmail({
 			to: highest.bidder.email,
-			subject: "Seller sent a counter-offer",
-			text: `The seller has sent a counter-offer of ₹${amount} for "${auction.itemName}".`,
+			subject: `Counter-Offer Proposal: Seller has made a counter-offer of Rs.${parseFloat(
+				amount
+			).toLocaleString()} for ${auction.itemName} - Response Required`,
+			html: `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+						<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter-Offer Received</h1>
+						
+						<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">The Seller Has Made a Counter-Offer</h2>
+						
+						<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+							<h3 style="color: #555; margin-top: 0;">Offer Details:</h3>
+							<p><strong>Item:</strong> ${auction.itemName}</p>
+							<p><strong>Your Original Bid:</strong> ₹${parseFloat(
+								highest.amount
+							).toLocaleString()}</p>
+							<p><strong>Seller's Counter-Offer:</strong> <span style="color: #FF9800; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								amount
+							).toLocaleString()}</span></p>
+							<p><strong>Seller:</strong> ${auction.seller.name}</p>
+						</div>
+						
+						<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+							<h4 style="color: #1976D2; margin-top: 0;">Action Required:</h4>
+							<ul style="color: #333; margin: 0;">
+								<li>Please log in to your account to accept or reject this counter-offer</li>
+								<li>You have the choice to accept the new price or decline</li>
+								<li>The seller is waiting for your response</li>
+							</ul>
+						</div>
+						
+						<div style="text-align: center; margin-top: 30px;">
+							<p style="background-color: #FF9800; color: white; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold;">
+								Please respond to this counter-offer at your earliest convenience
+							</p>
+						</div>
+						
+						<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+							<p>Thank you for using our auction platform!</p>
+							<p style="color: #999;">This is an automated email. Please do not reply.</p>
+						</div>
+					</div>
+				</div>
+			`,
+			text: `The seller has sent a counter-offer of ₹${parseFloat(
+				amount
+			).toLocaleString()} for "${
+				auction.itemName
+			}". Please log in to respond.`,
+		});
+
+		// Also notify seller that counter-offer was sent successfully
+		await sendEmail({
+			to: auction.seller.email,
+			subject: `Counter-Offer Confirmation: Your counter-offer of Rs.${parseFloat(
+				amount
+			).toLocaleString()} for ${
+				auction.itemName
+			} has been sent to the bidder`,
+			html: `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+					<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+						<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter-Offer Sent</h1>
+						
+						<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Counter-Offer Has Been Delivered</h2>
+						
+						<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+							<h3 style="color: #555; margin-top: 0;">Counter-Offer Details:</h3>
+							<p><strong>Item:</strong> ${auction.itemName}</p>
+							<p><strong>Original Bid:</strong> ₹${parseFloat(
+								highest.amount
+							).toLocaleString()}</p>
+							<p><strong>Your Counter-Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+								amount
+							).toLocaleString()}</span></p>
+							<p><strong>Bidder:</strong> ${highest.bidder.name} (${highest.bidder.email})</p>
+						</div>
+						
+						<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+							<h4 style="color: #1976D2; margin-top: 0;">What Happens Next:</h4>
+							<ul style="color: #333; margin: 0;">
+								<li>The bidder has been notified via email</li>
+								<li>They will log in to accept or reject your counter-offer</li>
+								<li>You'll be notified immediately of their decision</li>
+								<li>If accepted, both parties will receive confirmation and invoice</li>
+							</ul>
+						</div>
+						
+						<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+							<p>Thank you for using our auction platform!</p>
+							<p style="color: #999;">This is an automated email. Please do not reply.</p>
+						</div>
+					</div>
+				</div>
+			`,
 		});
 
 		const io = getIO();
@@ -423,6 +856,16 @@ async function handleCounterOffer(req, res) {
 			auctionId: auction.id,
 			bidderId: highest.bidderId,
 			amount,
+			counterAmount: amount,
+			originalBid: parseFloat(highest.amount),
+			bidderName: highest.bidder.name,
+			sellerMessage: `You sent a counter-offer of ₹${amount.toLocaleString()} to ${
+				highest.bidder.name
+			}`,
+			bidderMessage: `Seller sent you a counter-offer of ₹${amount.toLocaleString()} (original bid: ₹${parseFloat(
+				highest.amount
+			).toLocaleString()})`,
+			viewerMessage: `Seller sent a counter-offer of ₹${amount.toLocaleString()} to the highest bidder`,
 		});
 
 		res.json({ success: true, message: "Counter-offer sent", amount });
@@ -433,7 +876,7 @@ async function handleCounterOffer(req, res) {
 }
 
 async function handleCounterResponse(req, res) {
-	const { accept } = req.body; 
+	const { accept } = req.body;
 	try {
 		const auction = await Auction.findByPk(req.params.id, {
 			include: [
@@ -474,21 +917,135 @@ async function handleCounterResponse(req, res) {
 
 			await auction.save();
 
+			// Generate PDF invoice for successful transaction
+			const pdfData = await generateInvoicePDF(
+				auction,
+				req.user,
+				auction.seller
+			);
+
+			// Send confirmation emails to both buyer and seller with invoice
+			await sendEmail({
+				to: req.user.email,
+				subject: `Purchase Confirmed: Counter-offer accepted for ${
+					auction.itemName
+				} at Rs.${parseFloat(
+					counterOfferAmount
+				).toLocaleString()} - Payment and Invoice Details Enclosed`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Congratulations! You Won!</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Counter-Offer Accepted Successfully</h2>
+							
+							<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+								<h3 style="color: #555; margin-top: 0;">Final Transaction Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Original Bid:</strong> ₹${parseFloat(
+									highestBid.amount
+								).toLocaleString()}</p>
+								<p><strong>Seller's Counter-Offer:</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+									counterOfferAmount
+								).toLocaleString()}</span></p>
+								<p><strong>Seller:</strong> ${auction.seller.name} (${auction.seller.email})</p>
+							</div>
+							
+							<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">Next Steps:</h4>
+								<ul style="color: #333; margin: 0;">
+									<li>Invoice attached with complete transaction details</li>
+									<li>The seller will contact you for payment arrangements</li>
+									<li>Delivery will be arranged once payment is confirmed</li>
+									<li>Keep this email for your records</li>
+								</ul>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+				attachments: [
+					{
+						filename: `invoice-${auction.id}.pdf`,
+						content: pdfData.toString("base64"),
+						type: "application/pdf",
+						disposition: "attachment",
+					},
+				],
+			});
+
 			// Notify seller via email
 			await sendEmail({
 				to: auction.seller.email,
-				subject: "Counter-offer Accepted!",
-				text: `Good news! Your counter-offer of ₹${parseFloat(
-					counterOfferAmount
-				).toLocaleString()} for "${
+				subject: `Sale Finalized: Your counter-offer for ${
 					auction.itemName
-				}" has been accepted by ${highestBid.bidder.name}.`,
+				} has been accepted at Rs.${parseFloat(
+					counterOfferAmount
+				).toLocaleString()} - Transaction Complete`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #4CAF50; text-align: center; margin-bottom: 30px;">Counter-Offer Accepted!</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Your Item Has Been Sold</h2>
+							
+							<div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+								<h3 style="color: #555; margin-top: 0;">Final Sale Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Original Bid:</strong> ₹${parseFloat(
+									highestBid.amount
+								).toLocaleString()}</p>
+								<p><strong>Your Counter-Offer (ACCEPTED):</strong> <span style="color: #4CAF50; font-size: 1.2em; font-weight: bold;">₹${parseFloat(
+									counterOfferAmount
+								).toLocaleString()}</span></p>
+								<p><strong>Buyer:</strong> ${req.user.name} (${req.user.email})</p>
+							</div>
+							
+							<div style="background-color: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">Next Steps:</h4>
+								<ul style="color: #333; margin: 0;">
+									<li>The buyer will contact you for payment arrangements</li>
+									<li>Please arrange delivery once payment is confirmed</li>
+									<li>Invoice attached for your records</li>
+									<li>Congratulations on your successful sale!</li>
+								</ul>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+				attachments: [
+					{
+						filename: `invoice-${auction.id}.pdf`,
+						content: pdfData.toString("base64"),
+						type: "application/pdf",
+						disposition: "attachment",
+					},
+				],
 			});
 
 			io.to(auction.id).emit("counterAccepted", {
 				auctionId: auction.id,
 				amount: parseFloat(counterOfferAmount),
 				winnerId: req.user.id,
+				winnerName: req.user.name,
+				sellerMessage: `Your counter-offer of ₹${parseFloat(
+					counterOfferAmount
+				).toLocaleString()} has been accepted by ${req.user.name}`,
+				winnerMessage: `You accepted the counter-offer of ₹${parseFloat(
+					counterOfferAmount
+				).toLocaleString()}. Payment details sent via email.`,
+				viewerMessage: `Counter-offer accepted! Final price: ₹${parseFloat(
+					counterOfferAmount
+				).toLocaleString()}`,
 			});
 
 			res.json({
@@ -504,10 +1061,42 @@ async function handleCounterResponse(req, res) {
 
 			await auction.save();
 
-			// Notify seller via email
+			// Notify seller via email about counter-offer rejection
 			await sendEmail({
 				to: auction.seller.email,
-				subject: "Counter Offer Rejected",
+				subject: `Counter-Offer Response: Your counter-offer for ${auction.itemName} was declined by the bidder`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #f44336; text-align: center; margin-bottom: 30px;">Counter-Offer Rejected</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #f44336; padding-bottom: 10px;">Unfortunately, Your Counter-Offer Was Declined</h2>
+							
+							<div style="background-color: #ffebee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f44336;">
+								<h3 style="color: #555; margin-top: 0;">Rejected Offer Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Original Bid:</strong> ₹${parseFloat(
+									highestBid.amount
+								).toLocaleString()}</p>
+								<p><strong>Your Counter-Offer:</strong> ₹${parseFloat(
+									counterOfferAmount
+								).toLocaleString()}</p>
+								<p><strong>Bidder:</strong> ${highestBid.bidder.name}</p>
+								<p><strong>Final Status:</strong> <span style="color: #f44336; font-weight: bold;">Auction Closed - No Winner</span></p>
+							</div>
+							
+							<div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">What's Next:</h4>
+								<p style="color: #333; margin: 10px 0 0 0;">You can create a new auction with different terms or pricing if you'd like to try selling this item again.</p>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
 				text: `Unfortunately, your counter-offer of ₹${parseFloat(
 					counterOfferAmount
 				).toLocaleString()} for "${auction.itemName}" was rejected by ${
@@ -515,8 +1104,56 @@ async function handleCounterResponse(req, res) {
 				}.`,
 			});
 
+			// Also notify buyer confirming their rejection
+			await sendEmail({
+				to: req.user.email,
+				subject: `Action Confirmed: You have declined the counter-offer for ${auction.itemName} - Auction Closed`,
+				html: `
+					<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+						<div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+							<h1 style="color: #FF9800; text-align: center; margin-bottom: 30px;">Counter-Offer Rejected</h1>
+							
+							<h2 style="color: #333; border-bottom: 2px solid #FF9800; padding-bottom: 10px;">Counter-Offer Successfully Declined</h2>
+							
+							<div style="background-color: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+								<h3 style="color: #555; margin-top: 0;">Rejection Details:</h3>
+								<p><strong>Item:</strong> ${auction.itemName}</p>
+								<p><strong>Your Original Bid:</strong> ₹${parseFloat(
+									highestBid.amount
+								).toLocaleString()}</p>
+								<p><strong>Seller's Counter-Offer:</strong> ₹${parseFloat(
+									counterOfferAmount
+								).toLocaleString()}</p>
+								<p><strong>Your Decision:</strong> <span style="color: #f44336; font-weight: bold;">Rejected</span></p>
+							</div>
+							
+							<div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196F3;">
+								<h4 style="color: #1976D2; margin-top: 0;">Keep Bidding!</h4>
+								<p style="color: #333; margin: 10px 0 0 0;">Browse our platform for other exciting auctions. Your perfect item might be just a bid away!</p>
+							</div>
+							
+							<div style="text-align: center; margin-top: 30px; color: #666; font-size: 14px;">
+								<p>Thank you for using our auction platform!</p>
+								<p style="color: #999;">This is an automated email. Please do not reply.</p>
+							</div>
+						</div>
+					</div>
+				`,
+			});
+
 			io.to(auction.id).emit("counterRejected", {
 				auctionId: auction.id,
+				counterAmount: parseFloat(auction.counterOfferPrice),
+				rejectedBy: req.user.name,
+				sellerMessage: `Your counter-offer of ₹${parseFloat(
+					auction.counterOfferPrice
+				).toLocaleString()} was rejected by ${req.user.name}`,
+				bidderMessage: `You rejected the counter-offer of ₹${parseFloat(
+					auction.counterOfferPrice
+				).toLocaleString()}`,
+				viewerMessage: `Counter-offer of ₹${parseFloat(
+					auction.counterOfferPrice
+				).toLocaleString()} was rejected. Auction ended with no sale.`,
 			});
 
 			res.json({ success: true, message: "Counter Offer rejected" });
@@ -565,6 +1202,108 @@ async function handleGetInvoice(req, res) {
 		doc.pipe(res);
 	} catch (error) {
 		res.status(500).json({ message: error.message });
+	}
+}
+
+// Helper function to generate PDF invoice and return buffer
+async function generateInvoicePDF(auction, buyer, seller) {
+	try {
+		const doc = new PDFDocument({ size: "A4", margin: 50 });
+		const buffers = [];
+
+		doc.on("data", buffers.push.bind(buffers));
+
+		return new Promise((resolve, reject) => {
+			doc.on("end", () => {
+				try {
+					const pdfData = Buffer.concat(buffers);
+					resolve(pdfData);
+				} catch (error) {
+					reject(error);
+				}
+			});
+
+			doc.on("error", reject);
+
+			// Generate PDF content with enhanced styling
+			doc.fontSize(24)
+				.fillColor("#2E7D32")
+				.text("AUCTION INVOICE", { align: "center" })
+				.fillColor("#000000")
+				.moveDown();
+
+			doc.fontSize(14).text(`Invoice #: INV-${auction.id}`, {
+				align: "right",
+			});
+			doc.text(`Date: ${new Date().toLocaleDateString()}`, {
+				align: "right",
+			}).moveDown();
+
+			// Add a line separator
+			doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke().moveDown();
+
+			doc.fontSize(18)
+				.fillColor("#1976D2")
+				.text("Transaction Details", { underline: true })
+				.fillColor("#000000")
+				.moveDown();
+			doc.fontSize(12)
+				.text(`Item: ${auction.itemName}`)
+				.text(`Description: ${auction.description || "N/A"}`)
+				.text(
+					`Starting Price: Rs. ${parseFloat(
+						auction.startingPrice
+					).toLocaleString()}`
+				)
+				.text(
+					`Final Price: Rs. ${parseFloat(
+						auction.counterOfferPrice ||
+							auction.highestBid ||
+							auction.startingPrice
+					).toLocaleString()}`,
+					{ fontSize: 14, fillColor: "#2E7D32" }
+				)
+				.fillColor("#000000")
+				.moveDown();
+
+			doc.fontSize(18)
+				.fillColor("#1976D2")
+				.text("Seller Information", { underline: true })
+				.fillColor("#000000")
+				.moveDown();
+			doc.fontSize(12)
+				.text(`Name: ${seller.name}`)
+				.text(`Email: ${seller.email}`)
+				.moveDown();
+
+			doc.fontSize(18)
+				.fillColor("#1976D2")
+				.text("Buyer Information", { underline: true })
+				.fillColor("#000000")
+				.moveDown();
+			doc.fontSize(12)
+				.text(`Name: ${buyer.name}`)
+				.text(`Email: ${buyer.email}`)
+				.moveDown();
+
+			// Add a line separator
+			doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke().moveDown();
+
+			doc.fontSize(10)
+				.fillColor("#666666")
+				.text(
+					"This is a computer-generated invoice. Thank you for using our auction platform!",
+					{ align: "center" }
+				)
+				.text(`Generated on: ${new Date().toLocaleString()}`, {
+					align: "center",
+				});
+
+			doc.end();
+		});
+	} catch (error) {
+		console.error("Error generating invoice:", error);
+		throw error;
 	}
 }
 
