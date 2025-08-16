@@ -469,7 +469,7 @@ const PostAuctionActions = ({
 	};
 
 	const renderNoBidsSection = () => {
-		if (highestBidDetails || auction.winnerId) return null;
+		if (highestBidDetails || auction?.winnerId) return null;
 
 		const isSeller = auction.sellerId === userData?.id;
 
@@ -505,7 +505,7 @@ const PostAuctionActions = ({
 	const renderViewerStatusSection = () => {
 		// Show status for viewers who are not seller
 		if (isSeller || !hasHighestBid) return null;
-		const isHighestBidder = highestBidDetails.bidder.id === userData.id;
+		const isHighestBidder = highestBidDetails?.bidder?.id === userData?.id;
 		if (isHighestBidder && auction.statusAfterBid === "countered")
 			return null;
 		let statusMessage = "";

@@ -29,7 +29,9 @@ app.use(
 	})
 );
 app.use(cookieParser());
-
+app.get("/api/status", (req, res) => {
+	res.json({ status: "OK" });
+});
 app.use("/api/auth", authRouter);
 app.use("/api/auction", auctionRouter);
 app.use("/api/user", authenticateUser, userRouter);
