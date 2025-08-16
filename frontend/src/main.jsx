@@ -35,11 +35,11 @@ const router = createBrowserRouter(
 				<Route path="/" element={<Home />} />
 				<Route element={<ProtectedLayout />}>
 					<Route path="/create-auction" element={<CreateAuction />} />
-					<Route path="/auction/:id" element={<AuctionPage />} />
 					<Route path="/my-auctions" element={<MyAuctions />} />
 					<Route path="/auction/live/:id" element={<LiveAuction />} />
 					<Route path="/admin" element={<AdminPanel />} />
 				</Route>
+				<Route path="/auction/:id" element={<AuctionPage />} />
 				<Route path="/auctions" element={<Auctions />} />
 			</Route>
 		</Route>

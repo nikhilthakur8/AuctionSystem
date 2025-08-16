@@ -97,9 +97,9 @@ const AdminPanel = () => {
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50 p-6">
+		<div className="min-h-screen bg-gray-50 p-6 py-20">
 			<div className="max-w-7xl mx-auto">
-				<h1 className="text-3xl font-bold text-gray-900 mb-8">
+				<h1 className="text-3xl font-light tracking-tight text-gray-900 mb-8">
 					Admin Panel
 				</h1>
 
@@ -189,17 +189,8 @@ const AdminPanel = () => {
 											{auction.seller?.name || "Unknown"}
 										</p>
 									</div>
-									<div className="flex items-center space-x-4">
-										<Badge
-											variant={
-												auction.status === "active"
-													? "default"
-													: auction.status ===
-													  "upcoming"
-													? "secondary"
-													: "outline"
-											}
-										>
+									<div className="flex items-center space-x-4 uppercase">
+										<Badge variant={auction.status}>
 											{auction.status}
 										</Badge>
 										<div className="flex space-x-2">
@@ -212,6 +203,7 @@ const AdminPanel = () => {
 														"_blank"
 													)
 												}
+												title="View Auction"
 											>
 												<Eye className="h-4 w-4" />
 											</Button>
@@ -223,6 +215,7 @@ const AdminPanel = () => {
 															auction.id
 														)
 													}
+													title="Start Auction"
 												>
 													<Play className="h-4 w-4" />
 												</Button>
@@ -235,6 +228,7 @@ const AdminPanel = () => {
 														auction.id
 													)
 												}
+												title="Reset Auction"
 											>
 												<RotateCcw className="h-4 w-4" />
 											</Button>
@@ -270,8 +264,9 @@ const AdminPanel = () => {
 										variant={
 											user.role === "admin"
 												? "destructive"
-												: "secondary"
+												: "outline"
 										}
+										className={"uppercase"}
 									>
 										{user.role}
 									</Badge>

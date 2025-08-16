@@ -65,13 +65,13 @@ const FooterClean = () => {
 							className="hover:text-white cursor-pointer"
 							onClick={() => navigate("/about")}
 						>
-							About
+							About Us
 						</li>
 						<li
 							className="hover:text-white cursor-pointer"
 							onClick={() => navigate("/contact")}
 						>
-							Contact
+							Contact Us
 						</li>
 					</ul>
 				</div>
@@ -82,25 +82,26 @@ const FooterClean = () => {
 					<ul className="space-y-1 text-gray-400">
 						<li
 							className="hover:text-white cursor-pointer"
-							onClick={() => navigate("/how-it-works")}
+							onClick={() => navigate("/auctions")}
 						>
-							How It Works
+							Auctions
 						</li>
 						<li
 							className="hover:text-white cursor-pointer"
-							onClick={() => navigate("/faq")}
+							onClick={() => navigate("/auctions")}
 						>
-							FAQ
+							Live Auctions
 						</li>
+
 						<li
 							className="hover:text-white cursor-pointer"
-							onClick={() => navigate("/terms")}
+							onClick={() => navigate("/")}
 						>
 							Terms & Conditions
 						</li>
 						<li
 							className="hover:text-white cursor-pointer"
-							onClick={() => navigate("/support")}
+							onClick={() => navigate("/")}
 						>
 							Support
 						</li>
@@ -111,12 +112,10 @@ const FooterClean = () => {
 				<div className="space-y-2">
 					<h3 className="text-lg font-semibold">Contact</h3>
 					<p className="text-gray-400">
-						Email: support@Auctioneer.com
+						Email: support@auctioneer.com
 					</p>
-					<p className="text-gray-400">Phone: +91 123-456-7890</p>
-					<p className="text-gray-400">
-						Address: 123 Auction St, City, Country
-					</p>
+					<p className="text-gray-400">Phone: 100</p>
+					<p className="text-gray-400">Address: Delhi, India</p>
 				</div>
 			</div>
 
