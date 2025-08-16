@@ -22,13 +22,13 @@ auctionRouter.get("/list", handleGetAllAuction);
 auctionRouter.get("/:id", handleGetAuctionById);
 auctionRouter.put("/:id", authenticateUser, handleUpdateAuction);
 auctionRouter.delete("/:id", authenticateUser, handleDeleteAuction);
-auctionRouter.post("/place-bid", handlePlaceBid);
+auctionRouter.post("/place-bid", authenticateUser, handlePlaceBid);
 // Seller actions: accept or reject highest bid
-auctionRouter.post("/:id/accept", handleAcceptBid);
-auctionRouter.post("/:id/reject", handleRejectBid);
-auctionRouter.post("/:id/counter-offer", handleCounterOffer);
+auctionRouter.post("/:id/accept", authenticateUser, handleAcceptBid);
+auctionRouter.post("/:id/reject", authenticateUser, handleRejectBid);
+auctionRouter.post("/:id/counter-offer", authenticateUser, handleCounterOffer);
 // Counter-response by bidder
-auctionRouter.post("/:id/counter-response", handleCounterResponse);
+auctionRouter.post("/:id/counter-response", authenticateUser, handleCounterResponse);
 // Invoice generation
-auctionRouter.get("/:id/invoice", handleGetInvoice);
+auctionRouter.get("/:id/invoice", authenticateUser, handleGetInvoice);
 module.exports = auctionRouter;
