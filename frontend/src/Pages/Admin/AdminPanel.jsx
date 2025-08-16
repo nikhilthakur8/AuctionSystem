@@ -20,7 +20,7 @@ const AdminPanel = () => {
 	});
 	const [loading, setLoading] = useState(true);
 
-	const backendUrl = import.meta.env.VITE_BACKEND_URL;
+	const backendUrl = import.meta.env.VITE_BACKEND_URL || "";
 
 	const fetchAdminData = useCallback(async () => {
 		try {
